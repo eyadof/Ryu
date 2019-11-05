@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use 5.006;
+use 5.018;
 
 use ExtUtils::MakeMaker;
 
@@ -14,7 +14,7 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "Ryu",
   "LICENSE" => "perl",
-  "MIN_PERL_VERSION" => "5.006",
+  "MIN_PERL_VERSION" => "5.018",
   "NAME" => "Ryu",
   "PREREQ_PM" => {
     "Encode" => "1.98",
@@ -30,11 +30,9 @@ my %WriteMakefileArgs = (
     "Scalar::Util" => "1.47",
     "Syntax::Keyword::Try" => "0.04",
     "Text::CSV" => 0,
-    "Variable::Disposition" => "0.004",
     "curry" => "1.001",
     "curry::weak" => 0,
     "indirect" => 0,
-    "namespace::clean" => "0.27",
     "overload" => 0,
     "parent" => 0,
     "sort" => 0,
@@ -55,9 +53,10 @@ my %WriteMakefileArgs = (
     "Test::Files" => "0.14",
     "Test::More" => "0.98",
     "Test::Refcount" => "0.07",
-    "Test::Warnings" => "0.024"
+    "Test::Warnings" => "0.024",
+    "Variable::Disposition" => "0.004"
   },
-  "VERSION" => "1.002",
+  "VERSION" => "1.008",
   "test" => {
     "TESTS" => "t/*.t t/source/*.t"
   }
@@ -94,7 +93,6 @@ my %FallbackPrereqs = (
   "curry" => "1.001",
   "curry::weak" => 0,
   "indirect" => 0,
-  "namespace::clean" => "0.27",
   "overload" => 0,
   "parent" => 0,
   "sort" => 0,

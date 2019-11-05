@@ -1,5 +1,63 @@
 Revision history for Ryu
 
+1.008     2019-11-06 00:05:39+08:00 Asia/Kuala_Lumpur
+    New features:
+
+    - support ->on_failed on Ryu::Source
+
+    Bugs fixed:
+
+    - a Ryu::Sink could be completed before the Ryu::Source, avoid
+    exceptions when the Ryu::Source subsequently completes and tries
+    to mark the Future as done
+
+1.007     2019-10-03 00:25:56+08:00 Asia/Kuala_Lumpur
+    No new features.
+
+    Bugs fixed:
+
+    - ->ordered_futures was terminating too early due to previous changes, now
+    only finishes after all items are complete.
+
+1.006     2019-10-01 12:48:37+08:00 Asia/Kuala_Lumpur
+    No new features.
+
+    Bugs fixed:
+
+    - ->with_index and some other methods were not completing when the parent
+    was finished - thanks to Amin Marashi for reporting
+    - lifetime handling for chained sources was simplified, ->each_while_source
+    was supposed to attach handlers for the parent rather than the child source
+    - dropped usage of namespace::clean
+
+1.005     2019-05-05 19:15:56+08:00 Asia/Kuala_Lumpur
+    No new features.
+
+    Bugs fixed:
+
+    - when there are no downstream nodes, the ->buffer node should accumulate
+    data until something is attached, to support the common pattern of
+    swapping out downstream nodes periodically (or when a threshold is reached)
+
+1.004     2019-04-30 02:03:42+08:00 Asia/Kuala_Lumpur
+    New features:
+
+    - ->take_until method
+
+1.003     2019-04-28 00:15:57+08:00 Asia/Kuala_Lumpur
+    Documentation fixes:
+
+    - Incorrect `C<>` block, thanks to MANWAR for reporting+submitting a
+    [pull request for this](https://github.com/team-at-cpan/Ryu/pull/5).
+
+    Dependencies:
+
+    - minimum Perl version is now 5.18, as reported by SREZIC earlier
+    versions get stuck on the test suite for some reason. This is quite
+    likely to be a bug in the code, but legacy Perl support is not
+    currently a priority (newer Perl versions have lots of useful bugfixes
+    and improvements!).
+
 1.002     2019-04-21 00:21:55+08:00 Asia/Kuala_Lumpur
     New features:
 

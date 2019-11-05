@@ -103,7 +103,7 @@ Examples:
 
 =head2 print
 
-Shortcut for C< ->each(sub { print }) >, except this will
+Shortcut for C<< ->each(sub { print }) >>, except this will
 also save the initial state of C< $\ > and use that for each
 call for consistency.
 
@@ -400,6 +400,22 @@ Skips the items that arrive before a given condition is reached.
 
 =item * Either a L<Future> instance (we skip all items until it's marked as `done`), or a coderef,
 which we call for each item until it first returns true
+
+=back
+
+=head2 take_until
+
+Passes through items that arrive until a given condition is reached.
+
+Expects a single parameter, which can be one of the following:
+
+=over 4
+
+=item * a L<Future> instance - we will skip all items until it's marked as C<done>
+
+=item * a coderef, which we call for each item until it first returns true
+
+=item * or a L<Ryu::Source>, in which case we stop when that first emits a value
 
 =back
 
