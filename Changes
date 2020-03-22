@@ -1,5 +1,25 @@
 Revision history for Ryu
 
+1.012     2020-03-22 13:35:42+08:00 Asia/Kuala_Lumpur
+    New features:
+
+    - ->unblocked returns a Future which can be used to await a paused source/sink.
+
+1.011     2020-01-07 11:24:46+08:00 Asia/Kuala_Lumpur
+    No new features.
+
+    Bugs fixed:
+
+    - ->ordered_futures now cancels any pending Futures when the source fails.
+
+1.010     2019-12-25 20:55:38+08:00 Asia/Kuala_Lumpur
+    No new features.
+
+    Bugs fixed:
+
+    - ->take_until and ->skip_until may complete before the condition, handle that correctly
+    - fully-qualify calls to Scalar::Util::refaddr to avoid runtime errors
+
 1.009     2019-11-17 23:53:21+08:00 Asia/Kuala_Lumpur
     No new features.
 

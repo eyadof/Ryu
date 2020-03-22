@@ -5,7 +5,7 @@ use warnings;
 
 use parent qw(Ryu::Node);
 
-our $VERSION = '1.009'; # VERSION
+our $VERSION = '1.012'; # VERSION
 
 =head1 NAME
 
@@ -28,6 +28,7 @@ point.
 
 no indirect;
 
+use sort qw(stable);
 use Scalar::Util ();
 use Ref::Util ();
 use List::Util ();
@@ -758,7 +759,7 @@ sub buffer {
         my ($f) = @_;
         return if @pending;
         my $addr = Scalar::Util::refaddr($code);
-        my $count = List::UtilsBy::extract_by { $addr == refaddr($_) } @{$self->{on_item}};
+        my $count = List::UtilsBy::extract_by { $addr == Scalar::Util::refaddr($_) } @{$self->{on_item}};
         $f->on_ready($src->completed) unless $src->is_ready;
         $log->tracef("->each_while_source completed on %s for refaddr 0x%x, removed %d on_item handlers", $self->describe, Scalar::Util::refaddr($self), $count);
     });
@@ -1016,9 +1017,18 @@ sub switch_str {
 =head2 ordered_futures
 
 Given a stream of L<Future>s, will emit the results as each L<Future>
-is marked ready. If any fail, the stream will fail.
+is marked ready.
 
-This is a terrible name for a method, expect it to change.
+If any L<Future> in the stream fails, that will mark this source as failed,
+and all remaining L<Future> instances will be cancelled. To avoid this behaviour
+and leave the L<Future> instances active, use:
+
+ $src->map('without_cancel')
+     ->ordered_futures
+
+See L<Future/without_cancel> for more details.
+
+This method is also available as L</resolve>.
 
 =cut
 
@@ -1026,29 +1036,42 @@ sub ordered_futures {
     my ($self) = @_;
     my $src = $self->chained(label => (caller 0)[3] =~ /::([^:]+)$/);
     my %pending;
-    Scalar::Util::weaken(my $upstream_completed = $self->completed);
+    my $src_completed = $src->completed;
     my $all_finished = 0;
-    $upstream_completed->on_ready(sub {
+    $self->completed->on_ready(sub {
         $all_finished = 1;
-        $src->completed->done unless %pending or $src->completed->is_ready;
+        $src->completed->done unless %pending or $src_completed->is_ready;
     });
 
     $self->each(sub {
         my $k = Scalar::Util::refaddr $_;
         $pending{$k} = 1;
         $log->tracef('Ordered futures has %d pending', 0 + keys %pending);
-        $_->on_done($src->curry::weak::emit)
-          ->on_fail($src->curry::weak::fail)
+        my $f = $_;
+        $src_completed->on_ready(sub { $f->cancel });
+        $_->on_done(sub {
+            my @pending = @_;
+            while(@pending and not $src_completed->is_ready) {
+                $src->emit(shift @pending);
+            }
+        })
+          ->on_fail(sub { $src->fail(@_) unless $src_completed->is_ready; })
           ->on_ready(sub {
               delete $pending{$k};
               $log->tracef('Ordered futures now has %d pending after completion, upstream finish status is %d', 0 + keys(%pending), $all_finished);
               return if %pending;
-              $src->completed->done if $all_finished and not $src->completed->is_ready;
+              $src_completed->done if $all_finished and not $src_completed->is_ready;
           })
           ->retain
     });
     return $src;
 }
+
+=head2 resolve
+
+A synonym for L</ordered_futures>.
+
+=cut
 
 *resolve = *ordered_futures;
 
@@ -1202,7 +1225,6 @@ See L</sort_by>.
 =cut
 
 sub rev_nsort_by {
-    use sort qw(stable);
     my ($self, $code) = @_;
     my $src = $self->chained(label => (caller 0)[3] =~ /::([^:]+)$/);
     my @items;
@@ -1304,7 +1326,12 @@ sub skip_until {
             my $reached = 0;
             sub { return $src->emit($_) if $reached ||= $condition->($_); }
         } elsif(Scalar::Util::blessed($condition) && $condition->isa('Future')) {
-            $condition->on_fail($src->completed)->on_cancel($src->completed);
+            $condition->on_ready($src->$curry::weak(sub {
+                my ($src, $cond) = @_;
+                return if $src->is_ready;
+                $src->fail($cond->failure) if $cond->is_failed;
+                $src->cancel if $cond->is_cancelled
+            }));
             sub { $src->emit($_) if $condition->is_done; }
         } else {
             die 'unknown type for condition: ' . $condition;
@@ -1351,7 +1378,12 @@ sub take_until {
                 my $reached = 0;
                 sub { return $src->emit($_) unless $reached ||= $condition->($_); }
             } elsif(Scalar::Util::blessed($condition) && $condition->isa('Future')) {
-                $condition->on_fail($src->completed)->on_cancel($src->completed);
+                $condition->on_ready($src->$curry::weak(sub {
+                    my ($src, $cond) = @_;
+                    return if $src->is_ready;
+                    $src->fail($cond->failure) if $cond->is_failed;
+                    $src->cancel if $cond->is_cancelled
+                }));
                 sub { $src->emit($_) unless $condition->is_done; }
             } else {
                 die 'unknown type for condition: ' . $condition;
@@ -1817,7 +1849,7 @@ sub notify_child_completion {
     }
 
     $log->warnf("Child %s (addr 0x%x) not found in list for %s", $child->describe, $self->describe);
-    $log->tracef("* %s (addr 0x%x)", $_->describe, refaddr($_)) for @{$self->{children}};
+    $log->tracef("* %s (addr 0x%x)", $_->describe, Scalar::Util::refaddr($_)) for @{$self->{children}};
     $self
 }
 
@@ -1944,7 +1976,7 @@ sub each_while_source {
         my ($f) = @_;
         $args{cleanup}->($f, $src) if exists $args{cleanup};
         my $addr = Scalar::Util::refaddr($code);
-        my $count = List::UtilsBy::extract_by { $addr == refaddr($_) } @{$self->{on_item}};
+        my $count = List::UtilsBy::extract_by { $addr == Scalar::Util::refaddr($_) } @{$self->{on_item}};
         $f->on_ready($src->completed) unless $src->is_ready;
         $log->tracef("->each_while_source completed on %s for refaddr 0x%x, removed %d on_item handlers", $self->describe, Scalar::Util::refaddr($self), $count);
     });
@@ -2025,5 +2057,5 @@ Tom Molesworth <TEAM@cpan.org>
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2011-2019. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2011-2020. Licensed under the same terms as Perl itself.
 
