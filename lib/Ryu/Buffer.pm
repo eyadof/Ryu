@@ -3,7 +3,7 @@ package Ryu::Buffer;
 use strict;
 use warnings;
 
-our $VERSION = '2.000'; # VERSION
+our $VERSION = '2.001'; # VERSION
 our $AUTHORITY = 'cpan:TEAM'; # AUTHORITY
 
 use parent qw(Ryu::Node);
@@ -176,6 +176,76 @@ sub read_until {
         return $f unless length($self->{data});
         return $f unless $self->{data} =~ /$match/g;
         $f->done(substr($self->{data}, 0, pos($self->{data}), ''));
+    });
+    $self->process_pending;
+    $f;
+}
+
+my $pack_characters = q{aAZbBhHcCWsSlLqQiInNvVjJfdFpPUwx};
+my %character_sizes = map {
+    $_ => length(pack("x[$_]", ""))
+} split //, $pack_characters;
+
+=head2 read_packed
+
+Uses L<pack> template notation to define a pattern to extract.
+Will attempt to accumulate enough bytes to fulfill the request,
+then unpack and extract from the buffer.
+
+This method only supports a B<very limited> subset of the
+full L<pack> functionality - currently, this includes
+sequences such as C<A4> or C<N1n1>, but does B<not> handle
+multi-stage templates such as C<N/a*>.
+
+These would need to parse the initial C<N1> bytes to
+determine the full extent of the data to be processed, and
+the logic for handling this is not yet implemented.
+
+Takes the following parameters:
+
+=over 4
+
+=item * C<$format> - a L<pack>-style format string
+
+=back
+
+Returns a L<Future> which will resolve to the requested items,
+of which there can be more than one depending on the format string.
+
+=cut
+
+sub read_packed {
+    my ($self, $format) = @_;
+    my $f = $self->new_future;
+    my @handler;
+    my $simple_format = $format;
+
+    # Might as well avoid too much complexity
+    # in the parser
+    $simple_format =~ s{\[([0-9]+)\]}{$1}g;
+    $simple_format =~ s{\s+}{}g;
+    PARSER:
+    while(1) {
+        for($simple_format) {
+            if(my ($char, $count) = /\G([$pack_characters])[!><]?([0-9]*)/gc) {
+                $count *= $character_sizes{$char};
+                push @handler, {
+                    regex => qr/(.{$count})/,
+                }
+            }
+            last PARSER unless pos($_) < length($_);
+        }
+    }
+    my $re = join '', map { $_->{regex} } @handler;
+    push @{$self->{ops}}, $self->$curry::weak(sub {
+        my ($self) = @_;
+        return $f if $f->is_ready;
+        return $f unless length($self->{data});
+
+        return $f unless $self->{data} =~ m{^$re};
+        my @items = unpack $format, $self->{data};
+        $self->{data} =~ s{^$re}{};
+        $f->done(@items);
     });
     $self->process_pending;
     $f;
