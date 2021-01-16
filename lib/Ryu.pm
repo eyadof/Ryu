@@ -6,7 +6,7 @@ use warnings;
 # Older versions cannot complete the test suite successfully
 use 5.018;
 
-our $VERSION = '2.005';
+our $VERSION = '2.006';
 our $AUTHORITY = 'cpan:TEAM'; # AUTHORITY
 
 =encoding utf8
@@ -267,10 +267,25 @@ There are various documents, specifications and discussions relating to the conc
 
 =head1 AUTHOR
 
-Tom Molesworth C<< <TEAM@cpan.org> >> with contributions from Mohammad S Anwar,
-Michael Mueller, Zak Elep, Mohanad Zarzour and Nael Alolwani.
+Tom Molesworth C<< <TEAM@cpan.org> >> with contributions from:
+
+=over 4
+
+=item * Mohammad S Anwar
+
+=item * Michael Mueller
+
+=item * Zak Elep
+
+=item * Mohanad Zarzour
+
+=item * Nael Alolwani
+
+=item * Amin Marashi
+
+=back
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2011-2020. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2011-2021. Licensed under the same terms as Perl itself.
 
