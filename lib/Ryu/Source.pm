@@ -5,7 +5,7 @@ use warnings;
 
 use parent qw(Ryu::Node);
 
-our $VERSION = '2.004'; # VERSION
+our $VERSION = '2.005'; # VERSION
 our $AUTHORITY = 'cpan:TEAM'; # AUTHORITY
 
 =head1 NAME
@@ -938,16 +938,52 @@ Intended for stream protocol handling - individual
 sized packets are perhaps better suited to the
 L<Ryu::Source> per-item behaviour.
 
+Supports the following named parameters:
+
+=over 4
+
+=item * C<low> - low waterlevel for buffer, start accepting more bytes
+once the L<Ryu::Buffer> has less content than this
+
+=item * C<high> - high waterlevel for buffer, will pause the parent stream
+if this is reached
+
+=back
+
+The backpressure (low/high) values default to undefined, meaning
+no backpressure is applied: the buffer will continue to fill
+indefinitely.
+
 =cut
 
 sub as_buffer {
-    my ($self) = @_;
+    my ($self, %args) = @_;
+    my $low = delete $args{low};
+    my $high = delete $args{high};
+    # We're creating a source but keeping it to ourselves here
+    my $src = $self->chained(label => (caller 0)[3] =~ /::([^:]+)$/);
+
     my $buffer = Ryu::Buffer->new(
-        new_future => $self->{new_future}
+        new_future => $self->{new_future},
+        %args,
+        on_change => sub {
+            my ($self) = @_;
+            $src->resume if $low and $self->size <= $low;
+        }
     );
-    $self->each(sub {
-        $buffer->write($_)
-    });
+
+    Scalar::Util::weaken(my $weak_sauce = $src);
+    Scalar::Util::weaken(my $weak_buffer = $buffer);
+    $self->each_while_source(sub {
+        my $src = $weak_sauce or return;
+        my $buf = $weak_buffer or do {
+            $src->finish;
+            return;
+        };
+        $buf->write($_);
+        $src->pause if $high and $buf->size >= $high;
+        $src->resume if $low and $buf->size <= $low;
+    }, $src);
     return $buffer;
 }
 
